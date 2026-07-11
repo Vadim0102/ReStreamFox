@@ -27,6 +27,10 @@ authInternalUsers:
         path: live
       - action: playback
         path: live
+      - action: read
+        path: transcoded
+      - action: playback
+        path: transcoded
       - action: api
       - action: metrics
       - action: pprof
@@ -42,3 +46,7 @@ webrtc: yes
 
 paths:
   live:
+    # Бесшовное удержание потока: если стример не вещает, проигрывается видеофайл
+    alwaysAvailable: yes
+    alwaysAvailableFile: /data/offline.mp4
+  transcoded:
