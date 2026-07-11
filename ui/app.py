@@ -64,7 +64,11 @@ def read_outputs(path='/outputs/outputs.txt'):
                 continue
             if '=' in line:
                 name, url = line.split('=', 1)
-                outs.append({'name': name.strip(), 'url': url.strip()})
+                url = url.strip()
+                # Автоматическая корректировка отображения при отсутствии схемы
+                if '://' not in url:
+                    url = 'rtmp://' + url
+                outs.append({'name': name.strip(), 'url': url})
     return outs
 
 def login_required(f):

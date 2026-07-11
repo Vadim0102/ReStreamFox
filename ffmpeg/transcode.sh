@@ -33,6 +33,12 @@ while IFS= read -r line || [ -n "$line" ]; do
   [[ "$line" == \#* ]] && continue
   name=${line%%=*}
   url=${line#*=}
+  
+  # Если протокол не указан явно, подставляем rtmp:// по умолчанию
+  if [[ ! "$url" =~ ^[a-zA-Z0-9]+:// ]]; then
+    url="rtmp://$url"
+  fi
+  
   fmt=$(get_muxer_format "$url")
   TEE_PARTS+=("[f=$fmt]$url")
 done < /outputs/outputs.txt

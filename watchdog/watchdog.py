@@ -131,6 +131,7 @@ def generate_ffmpeg_env(cfg):
             os.remove(FF_ENV_FILE)
 
 def validate_outputs_file(path='/outputs/outputs.txt'):
+    # Убеждаемся, что файл существует
     if not os.path.exists(path):
         print(f"Outputs file {path} not found — exiting.")
         import sys
@@ -147,10 +148,13 @@ def validate_outputs_file(path='/outputs/outputs.txt'):
             else:
                 name, url = line.split('=', 1)
                 url = url.strip()
+                # Если протокол упущен, предупреждаем и автоматически подставляем rtmp://
                 if '://' not in url:
-                    bad.append((idx, line))
+                    print(f"Warning: line {idx} is missing a protocol scheme (e.g. 'rtmp://'). Assuming 'rtmp://{url}'")
+                    has_valid = True
                 else:
                     has_valid = True
+                    
     if bad:
         print('Invalid outputs in outputs/outputs.txt:')
         for i, l in bad:
