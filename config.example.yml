@@ -22,8 +22,11 @@ ffmpeg:
     tune: "zerolatency"
     pix_fmt: "yuv420p"
     gop: 120
-    resolution: "1920x1080" # Желаемое выходное разрешение стрима на платформах
-    framerate: 60           # Частота кадров (30 или 60)
+    resolution: "1920x1080"
+    framerate: 60
+    # Входящий кодек от OBS. "h264" по умолчанию. 
+    # Установите "h265", если ваша видеокарта поддерживает только HEVC/H.265 вещание.
+    ingest_codec: "h265"
   audio:
     codec: "aac"
     bitrate: "192k"

@@ -9,7 +9,6 @@ FF_MODE_FILE = '/data/ffmpeg.mode'
 FF_ENV_FILE = '/data/ffmpeg.env'
 
 def read_file_robust(path):
-    """Отказоустойчивое чтение файлов с поддержкой кодировок UTF-8 и Windows-1251 (CP1251)"""
     try:
         with open(path, 'r', encoding='utf-8') as f:
             return f.read()
@@ -58,7 +57,8 @@ def validate_config(cfg):
                             "pix_fmt": {"type": "string"},
                             "gop": {"type": ["integer", "string"]},
                             "resolution": {"type": "string"},
-                            "framerate": {"type": ["integer", "string"]}
+                            "framerate": {"type": ["integer", "string"]},
+                            "ingest_codec": {"type": "string"}
                         }
                     },
                     "audio": {
@@ -129,6 +129,8 @@ def generate_ffmpeg_env(cfg):
         lines.append(f"RESOLUTION={v.get('resolution')}")
     if 'framerate' in v:
         lines.append(f"FRAMERATE={v.get('framerate')}")
+    if 'ingest_codec' in v:
+        lines.append(f"INGEST_CODEC={v.get('ingest_codec')}")
 
     if 'codec' in a:
         lines.append(f"AUDIO_CODEC={a.get('codec')}")
