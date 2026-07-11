@@ -19,9 +19,10 @@ def load_config():
 
 
 def validate_config(cfg):
-    # Basic schema for important fields. Extend as needed.
+    # Strict schema for important fields. If invalid, exit to avoid misbehavior.
     schema = {
         "type": "object",
+        "required": ["mediamtx_api", "path_name", "check_interval"],
         "properties": {
             "mediamtx_api": {"type": "string"},
             "path_name": {"type": "string"},
@@ -31,9 +32,30 @@ def validate_config(cfg):
                 "properties": {
                     "enabled": {"type": "boolean"},
                     "file": {"type": "string"}
+                },
+                "required": ["enabled"]
+            },
+            "ffmpeg": {
+                "type": "object",
+                "properties": {
+                    "video": {
+                        "type": "object",
+                        "properties": {
+                            "codec": {"type": "string"},
+                            "bitrate": {"type": "string"},
+                            "preset": {"type": "string"}
+                        }
+                    },
+                    "audio": {
+                        "type": "object",
+                        "properties": {
+                            "codec": {"type": "string"},
+                            "bitrate": {"type": "string"}
+                        }
+                    }
                 }
             },
-            "ffmpeg": {"type": "object"}
+            "ui_admin_token": {"type": "string"}
         }
     }
     try:
@@ -41,8 +63,9 @@ def validate_config(cfg):
         validate(instance=cfg, schema=schema)
     except Exception as e:
         print(f"Config validation error: {e}")
-        # if validation fails, continue with defaults but warn
-        # to be strict, you may sys.exit(1)
+        print("Configuration invalid — watchdog exiting to avoid unsafe behavior.")
+        import sys
+        sys.exit(1)
 
 def mediamtx_paths(url):
     try:
@@ -96,6 +119,33 @@ def generate_ffmpeg_env(cfg):
         if os.path.exists(FF_ENV_FILE):
             os.remove(FF_ENV_FILE)
 
+def validate_outputs_file(path='/outputs/outputs.txt'):
+    # Ensure outputs file exists and lines look like name=rtmp://...
+    if not os.path.exists(path):
+        print(f"Outputs file {path} not found — exiting.")
+        import sys
+        sys.exit(1)
+    bad = []
+    with open(path, 'r', encoding='utf-8') as f:
+        for idx, raw in enumerate(f, start=1):
+            line = raw.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' not in line:
+                bad.append((idx, line))
+            else:
+                name, url = line.split('=',1)
+                url = url.strip()
+                if not (url.startswith('rtmp://') or url.startswith('rtmps://')):
+                    bad.append((idx, line))
+    if bad:
+        print('Invalid outputs in outputs/outputs.txt:')
+        for i,l in bad:
+            print(f"  line {i}: {l}")
+        print('Please fix outputs/outputs.txt — exiting.')
+        import sys
+        sys.exit(1)
+
 def read_current_mode():
     if os.path.exists(FF_MODE_FILE):
         return open(FF_MODE_FILE,'r',encoding='utf-8').read().strip()
@@ -114,6 +164,8 @@ def read_manual_override():
 
 def main():
     cfg = load_config()
+    # validate outputs file exists and has valid entries
+    validate_outputs_file('/outputs/outputs.txt')
     api = cfg.get('mediamtx_api', 'http://mediamtx:9997/v3/paths/list')
     path_name = cfg.get('path_name', 'live')
     check_interval = cfg.get('check_interval', 1)

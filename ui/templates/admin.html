@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>restream-stack Admin</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>body{font-family:system-ui,Arial;margin:20px} pre{background:#111;color:#eee;padding:10px;height:400px;overflow:auto}</style>
+  </head>
+  <body>
+    <h1>Admin</h1>
+    <div>
+      <button id="btnRestart">Restart transcoder</button>
+      <button id="btnForceMain">Force main</button>
+      <button id="btnForceBackup">Force backup</button>
+      <button id="btnAuto">Resume auto</button>
+    </div>
+    <h2>Outputs</h2>
+    <pre id="outputs">loading...</pre>
+
+    <h2>FFmpeg logs (live)</h2>
+    <pre id="logs">connecting...</pre>
+
+    <script>
+      const socket = io({ path: '/socket.io' });
+      socket.on('connect', ()=>{ console.log('ws connected'); });
+      socket.on('outputs', data=>{ document.getElementById('outputs').textContent = JSON.stringify(data.outputs, null, 2); });
+      socket.on('logs', data=>{ const p=document.getElementById('logs'); p.textContent = data.lines.join(''); p.scrollTop = p.scrollHeight; });
+      document.getElementById('btnRestart').onclick = ()=>{ socket.emit('restart', {}, (r)=>{ alert(JSON.stringify(r)); }); };
+      document.getElementById('btnForceMain').onclick = ()=>{ socket.emit('force',{mode:'main'}, r=>alert(JSON.stringify(r))); };
+      document.getElementById('btnForceBackup').onclick = ()=>{ socket.emit('force',{mode:'backup'}, r=>alert(JSON.stringify(r))); };
+      document.getElementById('btnAuto').onclick = ()=>{ socket.emit('force',{mode:'auto'}, r=>alert(JSON.stringify(r))); };
+      // request initial
+      socket.emit('get_outputs');
+      socket.emit('tail_logs');
+    </script>
+  </body>
+  </html>

@@ -32,11 +32,29 @@
     <button onclick="force('backup')">Force backup</button>
     <button onclick="force('stop')">Stop</button>
     <button onclick="force('auto')">Resume auto</button>
+    <button onclick="restart()">Restart transcoder</button>
+    <button onclick="showOutputs()">Show outputs</button>
+    <button onclick="showLogs()">Show logs</button>
 
     <script>
       function force(mode){
         fetch('/api/force',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode})})
         .then(r=>r.json()).then(j=>{ if(j.ok) alert('ok'); else alert('error:'+j.error) })
+      }
+
+      function restart(){
+        fetch('/api/restart',{method:'POST'}).then(r=>r.json()).then(j=>{ if(j.ok) alert('restarted'); else alert('error:'+j.error) })
+      }
+
+      function showOutputs(){
+        fetch('/api/outputs').then(r=>r.json()).then(j=>{ if(j.outputs) alert(JSON.stringify(j.outputs,null,2)) })
+      }
+
+      function showLogs(){
+        fetch('/api/logs?n=200').then(r=>r.json()).then(j=>{ if(j.ok) {
+            const w = window.open('', '_blank');
+            w.document.write('<pre>'+ j.lines.join('') +'</pre>')
+          } else alert('no logs') })
       }
     </script>
   </body>

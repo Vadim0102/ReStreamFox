@@ -59,11 +59,11 @@ while true; do
 
   echo "Requested mode: $MODE"
   if [ "$MODE" = "main" ]; then
-    /app/transcode.sh &
+    ( /app/transcode.sh ) > /data/ffmpeg.log 2>&1 &
     echo $! > "$FF_PID_FILE"
     echo "$MODE" > /data/ffmpeg.mode
   elif [ "$MODE" = "backup" ]; then
-    /app/backup.sh &
+    ( /app/backup.sh ) > /data/ffmpeg.log 2>&1 &
     echo $! > "$FF_PID_FILE"
     echo "$MODE" > /data/ffmpeg.mode
   elif [ "$MODE" = "stop" ]; then

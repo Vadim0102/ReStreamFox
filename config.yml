@@ -11,3 +11,12 @@ ffmpeg:
     codec: libx264
     bitrate: 6000k
     preset: veryfast
+    tune: zerolatency
+  audio:
+    codec: aac
+    bitrate: 192k
+
+# UI admin token: set a strong random string. Required for REST restart when Docker socket exposed.
+ui_admin_token: "REPLACE_WITH_STRONG_TOKEN"
+ui_admin_password: "changeme"
+ui_secret: "change_this_secret"
