@@ -32,8 +32,17 @@ while IFS= read -r line || [ -n "$line" ]; do
   [[ "$line" == \#* ]] && continue
   name=${line%%=*}
   url=${line#*=}
+  
+  # Auto-prepend rtmp:// if no protocol is defined
+  if [[ ! "$url" =~ ^[a-zA-Z0-9]+:// ]]; then
+    url="rtmp://$url"
+  fi
+  
   fmt=$(get_muxer_format "$url")
-  TEE_PARTS+=("[f=$fmt]$url")
+  
+  # Интеллектуальная обертка в fifo для фонового автопереподключения каждые 5 секунд
+  # drop_pkts_on_overflow=1 предохраняет сервер от утечки памяти при долгом офлайне платформы
+  TEE_PARTS+=("[f=fifo:fifo_format=$fmt:onfail=ignore:drop_pkts_on_overflow=1:attempt_recovery=1:recovery_wait_time=5:recover_any_error=1]$url")
 done < /outputs/outputs.txt
 
 if [ ${#TEE_PARTS[@]} -eq 0 ]; then
@@ -45,8 +54,8 @@ TEE_JOINED=$(IFS='|'; echo "${TEE_PARTS[*]}")
 
 echo "Starting main transcode from $INPUT_URL -> $TEE_JOINED"
 
-# Добавлен явный маппинг -map 0:v -map 0:a для корректной передачи потоков в tee
-exec ffmpeg -fflags nobuffer -flags low_delay -i "$INPUT_URL" \
+# Добавлен флаг +global_header для бесшовного подхвата картинки при переподключениях
+exec ffmpeg -fflags nobuffer -flags +low_delay+global_header -i "$INPUT_URL" \
   -map 0:v -map 0:a \
   -c:v ${VIDEO_CODEC:-libx264} \
   -preset ${PRESET:-veryfast} -tune ${TUNE:-zerolatency} \
