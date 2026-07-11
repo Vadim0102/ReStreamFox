@@ -24,10 +24,23 @@ CONFIG_PATH = '/app/config.yml'
 MANUAL_PATH = '/data/manual_mode'
 CONTROL_PATH = '/data/control'
 
+def read_file_robust(path):
+    """Отказоустойчивое чтение файлов с поддержкой кодировок UTF-8 и Windows-1251 (CP1251)"""
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except UnicodeDecodeError:
+        try:
+            with open(path, 'r', encoding='cp1251') as f:
+                return f.read()
+        except Exception:
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+
 def load_config():
     if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f) or {}
+        content = read_file_robust(CONFIG_PATH)
+        return yaml.safe_load(content) or {}
     return {}
 
 def get_ui_value(cfg, key, default=None):
@@ -57,18 +70,18 @@ def read_outputs(path='/outputs/outputs.txt'):
     outs = []
     if not os.path.exists(path):
         return outs
-    with open(path, 'r', encoding='utf-8') as f:
-        for raw in f:
-            line = raw.strip()
-            if not line or line.startswith('#'):
-                continue
-            if '=' in line:
-                name, url = line.split('=', 1)
-                url = url.strip()
-                # Автоматическая корректировка отображения при отсутствии схемы
-                if '://' not in url:
-                    url = 'rtmp://' + url
-                outs.append({'name': name.strip(), 'url': url})
+    content = read_file_robust(path)
+    for raw in content.splitlines():
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        if '=' in line:
+            name, url = line.split('=', 1)
+            url = url.strip()
+            # Автоматическая корректировка отображения при отсутствии схемы
+            if '://' not in url:
+                url = 'rtmp://' + url
+            outs.append({'name': name.strip(), 'url': url})
     return outs
 
 def login_required(f):
@@ -188,7 +201,6 @@ def api_logs():
 
 @app.route('/api/restart', methods=['POST'])
 def api_restart():
-    # Allow if session has admin, or if token header matches
     cfg = load_config()
     token = get_ui_value(cfg, 'admin_token')
     

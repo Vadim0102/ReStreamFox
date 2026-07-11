@@ -8,12 +8,25 @@ CONTROL_FILE = '/data/control'
 FF_MODE_FILE = '/data/ffmpeg.mode'
 FF_ENV_FILE = '/data/ffmpeg.env'
 
+def read_file_robust(path):
+    """Отказоустойчивое чтение файлов с поддержкой кодировок UTF-8 и Windows-1251 (CP1251)"""
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except UnicodeDecodeError:
+        try:
+            with open(path, 'r', encoding='cp1251') as f:
+                return f.read()
+        except Exception:
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+
 def load_config():
     if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            cfg = yaml.safe_load(f) or {}
-            validate_config(cfg)
-            return cfg
+        content = read_file_robust(CONFIG_PATH)
+        cfg = yaml.safe_load(content) or {}
+        validate_config(cfg)
+        return cfg
     return {}
 
 def validate_config(cfg):
@@ -140,21 +153,21 @@ def validate_outputs_file(path='/outputs/outputs.txt'):
         sys.exit(1)
     bad = []
     has_valid = False
-    with open(path, 'r', encoding='utf-8') as f:
-        for idx, raw in enumerate(f, start=1):
-            line = raw.strip()
-            if not line or line.startswith('#'):
-                continue
-            if '=' not in line:
-                bad.append((idx, line))
+    content = read_file_robust(path)
+    for idx, raw in enumerate(content.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        if '=' not in line:
+            bad.append((idx, line))
+        else:
+            name, url = line.split('=', 1)
+            url = url.strip()
+            if '://' not in url:
+                print(f"Warning: line {idx} is missing a protocol scheme (e.g. 'rtmp://'). Assuming 'rtmp://{url}'")
+                has_valid = True
             else:
-                name, url = line.split('=', 1)
-                url = url.strip()
-                if '://' not in url:
-                    print(f"Warning: line {idx} is missing a protocol scheme (e.g. 'rtmp://'). Assuming 'rtmp://{url}'")
-                    has_valid = True
-                else:
-                    has_valid = True
+                has_valid = True
                     
     if bad:
         print('Invalid outputs in outputs/outputs.txt:')
