@@ -2,7 +2,6 @@
 set -e
 
 # 1. Генерация и оптимизация резервного файла на старте
-# Если в /data нет готового offline.mp4, мы создаем его из картинки (png, jpg) или генерируем черный экран
 if [ ! -f "/data/offline.mp4" ]; then
   IMG_FILE=""
   for ext in png jpg jpeg webp; do
@@ -76,8 +75,8 @@ while IFS= read -r line || [ -n "$line" ]; do
   (
     while true; do
       echo "[Pusher:$name] Streaming to $url..."
-      # -c copy потребляет 0% процессора, просто пересылая готовый поток транскодера
-      ffmpeg -fflags nobuffer -rtsp_transport tcp -i "rtsp://localhost:8554/transcoded" \
+      # Читаем поток из медиасервера "mediamtx" строго по протоколу TCP
+      ffmpeg -fflags nobuffer -rtsp_transport tcp -i "rtsp://mediamtx:8554/transcoded" \
         -c copy -f "$fmt" "$url" > "/data/ffmpeg_${name}.log" 2>&1 || true
       echo "[Pusher:$name] Disconnected. Reconnecting in 5 seconds..."
       sleep 5

@@ -31,6 +31,9 @@ authInternalUsers:
         path: transcoded
       - action: playback
         path: transcoded
+      # Разрешаем внутреннему транскодеру публиковать пережатый поток
+      - action: publish
+        path: transcoded
       - action: api
       - action: metrics
       - action: pprof
