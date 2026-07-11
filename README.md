@@ -8,6 +8,10 @@ Security notes
 - Mounting the Docker socket into UI (`/var/run/docker.sock`) grants powerful permissions to the UI container; prefer the fallback `manual_mode` approach or a controlled socket-proxy with hardened access.
 
 See full documentation in `docs/DOCUMENTATION.md` for architecture, config reference, security guidance, and development notes.
+
+Beginner guide
+
+If you're new to Docker or streaming, read `docs/BEGINNER_GUIDE.md` — it explains step-by-step how to set up, configure `outputs/outputs.txt`, set admin secrets, and common troubleshooting steps (including the CI `Dockerfile not found` error and how we fixed it).
 # restream-stack
 
 Lightweight restreaming stack using MediaMTX, FFmpeg and a Watchdog.

@@ -32,13 +32,30 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Build images
+      - name: Build ffmpeg image
         uses: docker/build-push-action@v5
         with:
+          context: ./ffmpeg
+          file: ./ffmpeg/Dockerfile
           push: false
-          tags: |
-            restreamfox/ffmpeg:ci
-            restreamfox/watchdog:ci
-            restreamfox/ui:ci
+          tags: restreamfox/ffmpeg:ci
+          build-args: |
+            PYTHONUNBUFFERED=1
+      - name: Build watchdog image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./watchdog
+          file: ./watchdog/Dockerfile
+          push: false
+          tags: restreamfox/watchdog:ci
+          build-args: |
+            PYTHONUNBUFFERED=1
+      - name: Build ui image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ui
+          file: ./ui/Dockerfile
+          push: false
+          tags: restreamfox/ui:ci
           build-args: |
             PYTHONUNBUFFERED=1
