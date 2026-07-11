@@ -40,8 +40,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   
   fmt=$(get_muxer_format "$url")
   
-  # Интеллектуальная обертка в fifo для фонового автопереподключения каждые 5 секунд
-  # drop_pkts_on_overflow=1 предохраняет сервер от утечки памяти при долгом офлайне платформы
+  # Интеллектуальная обертка в fifo для фонового автопереподключения
   TEE_PARTS+=("[f=fifo:fifo_format=$fmt:onfail=ignore:drop_pkts_on_overflow=1:attempt_recovery=1:recovery_wait_time=5:recover_any_error=1]$url")
 done < /outputs/outputs.txt
 
@@ -52,15 +51,27 @@ fi
 
 TEE_JOINED=$(IFS='|'; echo "${TEE_PARTS[*]}")
 
-echo "Starting main transcode from $INPUT_URL -> $TEE_JOINED"
+# Динамическая конфигурация с безопасными значениями по умолчанию
+FRAMERATE=${FRAMERATE:-60}
+GOP=${GOP:-$((FRAMERATE * 2))}
+KEYINT_MIN=${KEYINT_MIN:-$GOP}
+RESOLUTION=${RESOLUTION:-1920x1080}
 
-# Добавлен флаг +global_header для бесшовного подхвата картинки при переподключениях
+# Видеофильтр: жестко задает разрешение, квадратный пиксель (SAR 1:1) и соотношение сторон экрана 16:9 (DAR)
+SCALE_FILTER="scale=${RESOLUTION//x/:},setsar=1:1,setdar=16/9"
+
+echo "Starting main transcode from $INPUT_URL -> $TEE_JOINED (CFR: ${FRAMERATE}fps, GOP: ${GOP}, Resolution: ${RESOLUTION})"
+
+# -vsync cfr форсирует Constant Frame Rate (решает проблемы буферизации YouTube и запуска в ВК)
+# -sc_threshold 0 отключает лишние ключевые кадры при смене сцен, удерживая GOP ровно на 2 секундах
 exec ffmpeg -fflags nobuffer -flags +low_delay+global_header -i "$INPUT_URL" \
   -map 0:v -map 0:a \
+  -vsync cfr -r "$FRAMERATE" \
+  -vf "$SCALE_FILTER" \
   -c:v ${VIDEO_CODEC:-libx264} \
   -preset ${PRESET:-veryfast} -tune ${TUNE:-zerolatency} \
   -pix_fmt ${PIX_FMT:-yuv420p} -profile:v ${PROFILE:-high} -level ${LEVEL:-4.2} \
-  -g ${GOP:-120} -keyint_min ${KEYINT_MIN:-120} \
+  -g "$GOP" -keyint_min "$KEYINT_MIN" -sc_threshold 0 \
   -b:v ${BITRATE:-6000k} -maxrate ${MAXRATE:-6000k} -bufsize ${BUFSIZE:-3000k} \
   -c:a ${AUDIO_CODEC:-aac} -b:a ${AUDIO_BITRATE:-192k} -ar ${AUDIO_RATE:-48000} \
   -f tee "${TEE_JOINED}"

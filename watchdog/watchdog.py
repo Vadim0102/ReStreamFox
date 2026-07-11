@@ -43,7 +43,9 @@ def validate_config(cfg):
                             "preset": {"type": "string"},
                             "tune": {"type": "string"},
                             "pix_fmt": {"type": "string"},
-                            "gop": {"type": ["integer", "string"]}
+                            "gop": {"type": ["integer", "string"]},
+                            "resolution": {"type": "string"},
+                            "framerate": {"type": ["integer", "string"]}
                         }
                     },
                     "audio": {
@@ -109,10 +111,11 @@ def generate_ffmpeg_env(cfg):
     if 'pix_fmt' in v:
         lines.append(f"PIX_FMT={v.get('pix_fmt')}")
     if 'gop' in v:
-        gop_val = v.get('gop')
-        lines.append(f"GOP={gop_val}")
-        # Automatically align keyint_min with GOP for standard compliance if not defined
-        lines.append(f"KEYINT_MIN={gop_val}")
+        lines.append(f"GOP={v.get('gop')}")
+    if 'resolution' in v:
+        lines.append(f"RESOLUTION={v.get('resolution')}")
+    if 'framerate' in v:
+        lines.append(f"FRAMERATE={v.get('framerate')}")
 
     if 'codec' in a:
         lines.append(f"AUDIO_CODEC={a.get('codec')}")
@@ -131,7 +134,6 @@ def generate_ffmpeg_env(cfg):
             os.remove(FF_ENV_FILE)
 
 def validate_outputs_file(path='/outputs/outputs.txt'):
-    # Убеждаемся, что файл существует
     if not os.path.exists(path):
         print(f"Outputs file {path} not found — exiting.")
         import sys
@@ -148,7 +150,6 @@ def validate_outputs_file(path='/outputs/outputs.txt'):
             else:
                 name, url = line.split('=', 1)
                 url = url.strip()
-                # Если протокол упущен, предупреждаем и автоматически подставляем rtmp://
                 if '://' not in url:
                     print(f"Warning: line {idx} is missing a protocol scheme (e.g. 'rtmp://'). Assuming 'rtmp://{url}'")
                     has_valid = True
