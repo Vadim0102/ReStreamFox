@@ -6,9 +6,9 @@ ReStreamFox is a microservices-based streaming system orchestrated via Docker Co
 
 ```
                   ┌──────────────┐
-                  │  OBS / Source│
+                  │ OBS / Source │
                   └──────┬───────┘
-                         │ (RTMP/SRT)
+                         │ (RTMP/SRT with Auth)
                          ▼
                   ┌──────────────┐
                   │   MediaMTX   │◄──────────────┐
@@ -59,6 +59,26 @@ The stack utilizes FFmpeg's `tee` muxer which enables concurrent streaming using
 
 * **RTMP / RTMPS**: Automatically routed using the `flv` format wrapper. Perfect for standard RTMP ingest platforms and secure endpoints like Kick (`rtmps://`).
 * **SRT / UDP**: Routed using the `mpegts` format wrapper, which provides low-latency delivery over unstable network connections.
+
+---
+
+## Ingest Security (Auth)
+
+To protect your server from unauthorized broadcasters, the `live` path requires publication credentials.
+
+This is configured in `mediamtx/mediamtx.yml`:
+```yaml
+paths:
+  live:
+    publishUser: "streamer"
+    publishPass: "secure_ingest_key_here"
+```
+
+Because `publishUser` and `publishPass` only secure the `publish` action, the internal FFmpeg transcoder can pull RTSP without credentials locally.
+
+To stream from OBS Studio, use:
+* **SRT**: `srt://<IP>:8890?streamid=publish:live:streamer:secure_ingest_key_here`
+* **RTMP**: `rtmp://<IP>:1935/live?user=streamer&pass=secure_ingest_key_here`
 
 ---
 

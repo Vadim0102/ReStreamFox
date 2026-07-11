@@ -1,16 +1,15 @@
-/data/
-/outputs/*.key
-*.log
-*.pyc
-__pycache__/
-.DS_Store
-node_modules/
-env/
-vendor/
-
-# Runtime configuration (do not commit secrets)
+# Конфигурации с секретами
 config.yml
-
-# Outputs and runtime data
 outputs/outputs.txt
+mediamtx/mediamtx.yml
+
+# Временные папки и логи
 data/
+outputs/*
+!outputs/outputs.example.txt
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/

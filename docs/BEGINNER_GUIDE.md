@@ -73,7 +73,3 @@ Security notes
 
 - Do not commit `config.yml` with real secrets to public repos. Use environment variables or Docker secrets in production.
 - Mounting Docker socket into a web-facing container gives it root-equivalent control over the host — avoid or secure with a proxy.
-
-If you want, I can create a small `docker-compose.override.yml` with example mounts and environment variables to make getting started even easier.
-
-*** End Patch
