@@ -1,0 +1,17 @@
+logLevel: info
+
+api: yes
+apiAddress: :9997
+
+srt: yes
+srtAddress: :8890
+
+rtmp: yes
+
+rtsp: yes
+
+webrtc: yes
+
+paths:
+
+  live:

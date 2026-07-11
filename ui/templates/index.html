@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>restream-stack UI</title>
+    <style>
+      body{font-family:system-ui,Arial;margin:20px}
+      .platform{display:inline-block;margin-right:8px;padding:6px;border-radius:6px}
+      .green{background:#e6ffed}
+      .red{background:#ffe6e6}
+    </style>
+  </head>
+  <body>
+    <h1>restream-stack — статус</h1>
+    <h2>INPUT</h2>
+    <div>
+      {% if items %}
+        {% for it in items %}
+          <div><strong>{{ it.name }}</strong>: {{ 'READY' if it.ready else 'OFFLINE' }} — {{ it.video or '' }}</div>
+        {% endfor %}
+      {% else %}
+        <div>Нет ответов от MediaMTX</div>
+      {% endif %}
+    </div>
+
+    <h2>TRANSCODER</h2>
+    <div>Mode: {{ current_mode or 'unknown' }}</div>
+    <div>Manual: {{ manual or 'none' }}</div>
+
+    <h2>ACTIONS</h2>
+    <button onclick="force('main')">Force main</button>
+    <button onclick="force('backup')">Force backup</button>
+    <button onclick="force('stop')">Stop</button>
+    <button onclick="force('auto')">Resume auto</button>
+
+    <script>
+      function force(mode){
+        fetch('/api/force',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode})})
+        .then(r=>r.json()).then(j=>{ if(j.ok) alert('ok'); else alert('error:'+j.error) })
+      }
+    </script>
+  </body>
+  </html>

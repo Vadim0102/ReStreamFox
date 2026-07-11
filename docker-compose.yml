@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    volumes:
+      - ./mediamtx/mediamtx.yml:/etc/mediamtx.yml:ro
+    ports:
+      - "8890:8890/udp"
+      - "1935:1935"
+      - "8554:8554"
+      - "8889:8889"
+      - "9997:9997"
+    restart: unless-stopped
+
+  ffmpeg:
+    build: ./ffmpeg
+    container_name: ffmpeg
+    volumes:
+      - ./data:/data
+      - ./outputs:/outputs
+      - ./config.yml:/app/config.yml:ro
+    environment:
+      - TZ=UTC
+    restart: unless-stopped
+
+  watchdog:
+    build: ./watchdog
+    container_name: watchdog
+    volumes:
+      - ./data:/data
+      - ./outputs:/outputs
+      - ./config.yml:/app/config.yml:ro
+    depends_on:
+      - mediamtx
+    restart: unless-stopped
+
+  ui:
+    build: ./ui
+    container_name: restream-ui
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      - ./config.yml:/app/config.yml:ro
+    depends_on:
+      - mediamtx
+      - watchdog
+    restart: unless-stopped
+
+volumes:
+  data:
+    driver: local

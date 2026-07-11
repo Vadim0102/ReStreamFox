@@ -1,0 +1,13 @@
+mediamtx_api: http://mediamtx:9997/v3/paths/list
+path_name: live
+check_interval: 1
+
+backup:
+  enabled: true
+  file: /app/offline.mp4
+
+ffmpeg:
+  video:
+    codec: libx264
+    bitrate: 6000k
+    preset: veryfast
