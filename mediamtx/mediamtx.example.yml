@@ -4,16 +4,29 @@ logLevel: info
 api: yes
 apiAddress: :9997
 
-# Конфигурация аутентификации (разрешаем локальным службам доступ к API)
+# Конфигурация аутентификации (Новый формат MediaMTX v1.4+)
 authMethod: internal
 authInternalUsers:
+  # 1. Авторизованный стример. Требует ввода логина и пароля/стрим-ключа.
+  # Разрешает публикацию входящего потока ТОЛЬКО на путь "live".
+  - user: streamer
+    pass: secure_ingest_key_here
+    ips: []
+    permissions:
+      - action: publish
+        path: live
+
+  # 2. Гостевой доступ без пароля.
+  # Разрешает внутреннему FFmpeg и внешним плеерам читать поток,
+  # а также открывает доступ к API и метрикам для служб Watchdog и UI.
   - user: any
     pass:
     ips: []
     permissions:
-      - action: publish
       - action: read
+        path: live
       - action: playback
+        path: live
       - action: api
       - action: metrics
       - action: pprof
@@ -29,8 +42,3 @@ webrtc: yes
 
 paths:
   live:
-    # Защита входящего потока (Авторизация / Стрим-ключ для OBS)
-    # Только отправитель, указавший эти данные, сможет опубликовать поток.
-    # Скопируйте этот файл в mediamtx.yml и измените параметры на свои!
-    publishUser: "streamer"
-    publishPass: "secure_ingest_key_here"
