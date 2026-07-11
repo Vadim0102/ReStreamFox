@@ -1,7 +1,7 @@
 # Root example config for ReStreamFox
 # Copy to config.yml (root) or use service-specific configs (watchdog/config.yml)
 
-# MediaMTX API and path
+# MediaMTX API base URL and path
 mediamtx_api: "http://mediamtx:9997"
 path_name: "live"
 
@@ -15,11 +15,16 @@ backup:
 
 # FFmpeg encoding defaults used by watchdog to generate ffmpeg.env
 ffmpeg:
-  video_bitrate: "2500k"
-  audio_bitrate: "128k"
-  resolution: "1280x720"
-  vcodec: "libx264"
-  acodec: "aac"
+  video:
+    codec: "libx264"
+    bitrate: "2500k"
+    preset: "veryfast"
+    tune: "zerolatency"
+    pix_fmt: "yuv420p"
+    gop: 120
+  audio:
+    codec: "aac"
+    bitrate: "128k"
 
 # UI admin credentials (do not commit real secrets)
 ui:

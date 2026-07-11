@@ -5,7 +5,7 @@ services:
     image: bluenviron/mediamtx:latest
     container_name: mediamtx
     volumes:
-      - ./mediamtx/mediamtx.yml:/etc/mediamtx.yml:ro
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
     ports:
       - "8890:8890/udp"
       - "1935:1935"

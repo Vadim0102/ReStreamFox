@@ -24,7 +24,22 @@
       const socket = io({ path: '/socket.io' });
       socket.on('connect', ()=>{ console.log('ws connected'); });
       socket.on('outputs', data=>{ document.getElementById('outputs').textContent = JSON.stringify(data.outputs, null, 2); });
-      socket.on('logs', data=>{ const p=document.getElementById('logs'); p.textContent = data.lines.join(''); p.scrollTop = p.scrollHeight; });
+      socket.on('logs', data=>{ 
+        const p=document.getElementById('logs'); 
+        p.textContent = data.lines.join(''); 
+        p.scrollTop = p.scrollHeight; 
+      });
+      socket.on('log_lines', data => {
+        const p = document.getElementById('logs');
+        p.textContent += data.lines.join('');
+        // Limit total lines to avoid performance issues
+        const maxLines = 1000;
+        let lines = p.textContent.split('\n');
+        if (lines.length > maxLines) {
+          p.textContent = lines.slice(-maxLines).join('\n');
+        }
+        p.scrollTop = p.scrollHeight;
+      });
       document.getElementById('btnRestart').onclick = ()=>{ socket.emit('restart', {}, (r)=>{ alert(JSON.stringify(r)); }); };
       document.getElementById('btnForceMain').onclick = ()=>{ socket.emit('force',{mode:'main'}, r=>alert(JSON.stringify(r))); };
       document.getElementById('btnForceBackup').onclick = ()=>{ socket.emit('force',{mode:'backup'}, r=>alert(JSON.stringify(r))); };

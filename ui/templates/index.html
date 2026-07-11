@@ -28,6 +28,9 @@
     <div>Manual: {{ manual or 'none' }}</div>
 
     <h2>ACTIONS</h2>
+    {% if admin_pwd_set %}
+      <p style="color: #666; font-size: 0.9em;">* Actions require admin authentication via <a href="/admin">/admin</a> page.</p>
+    {% endif %}
     <button onclick="force('main')">Force main</button>
     <button onclick="force('backup')">Force backup</button>
     <button onclick="force('stop')">Stop</button>
@@ -39,11 +42,11 @@
     <script>
       function force(mode){
         fetch('/api/force',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode})})
-        .then(r=>r.json()).then(j=>{ if(j.ok) alert('ok'); else alert('error:'+j.error) })
+        .then(r=>r.json()).then(j=>{ if(j.ok) alert('ok'); else alert('error: '+ (j.error || 'unauthorized')) })
       }
 
       function restart(){
-        fetch('/api/restart',{method:'POST'}).then(r=>r.json()).then(j=>{ if(j.ok) alert('restarted'); else alert('error:'+j.error) })
+        fetch('/api/restart',{method:'POST'}).then(r=>r.json()).then(j=>{ if(j.ok) alert('restarted'); else alert('error: '+ (j.error || 'unauthorized')) })
       }
 
       function showOutputs(){

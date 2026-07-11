@@ -1,91 +1,55 @@
-## Admin Page and Security
+# ReStreamFox 🦊
 
-This project includes a Web UI with an admin page (`/admin`) that requires login. The admin page uses WebSocket (Socket.IO) to stream `ffmpeg` logs live and to send control commands (force mode, restart transcoder). Administrative actions require an admin password set in `config.yml` under `ui_admin_password` and the Flask `secret` under `ui_secret`.
+A lightweight, robust, self-hosted multi-streaming stack powered by **MediaMTX**, **FFmpeg**, and a Python-based **Watchdog**. It allows you to ingest a single live stream from OBS/vMix (via RTMP, SRT, RTSP, or WebRTC) and distribute it to multiple platforms simultaneously (e.g., YouTube, Twitch, Kick) with automatic failover to a looping offline video or a static backup image.
 
-Security notes
+---
 
-- Do not embed admin secrets in public repos. Use environment variables or a secrets manager in production.
-- Mounting the Docker socket into UI (`/var/run/docker.sock`) grants powerful permissions to the UI container; prefer the fallback `manual_mode` approach or a controlled socket-proxy with hardened access.
+## Features
 
-See full documentation in `docs/DOCUMENTATION.md` for architecture, config reference, security guidance, and development notes.
+- **Single Transcoding Instance**: Encodes the source stream once using FFmpeg and multiplexes it to multiple target platforms using the efficient `tee` muxer.
+- **Protocol Versatility**: Supports both standard RTMP and secure RTMPS (required for Kick, Facebook Live) as well as SRT and UDP.
+- **Failover Mode**: Automatically switches to an offline fallback loop if the primary source stream goes offline.
+- **Static Image Support**: Accepts static image files (`.png`, `.jpg`, `.jpeg`, `.webp`) as a backup screen, complete with synthesized silent audio to satisfy platform ingest requirements.
+- **Web Administration Panel**: Built-in Flask + Socket.IO dashboard to monitor live status, view real-time FFmpeg logs, force manual streaming modes, and perform safe restarts.
 
-Beginner guide
+---
 
-If you're new to Docker or streaming, read `docs/BEGINNER_GUIDE.md` — it explains step-by-step how to set up, configure `outputs/outputs.txt`, set admin secrets, and common troubleshooting steps (including the CI `Dockerfile not found` error and how we fixed it).
+## Quick Start
 
-Configuration and runtime files
-
-- Template: a build-time template lives at `watchdog/config.example.yml`. Copy it to `watchdog/config.yml` and edit before running, or keep a runtime `config.yml` outside the repository and mount it into containers.
-- Do not commit secrets: `config.yml`, `outputs/outputs.txt` and `data/` are ignored by `.gitignore`.
-- Recommended local override: create `docker-compose.override.yml` with mounts for `./runtime/config.yml:/app/config.yml:ro` and `./data:/data` for testing.
-
-Quick start
-
-1. Copy the example config and edit secrets:
-
-```bash
-cp watchdog/config.example.yml watchdog/config.yml
-# edit watchdog/config.yml (set ui.admin_password, ui.secret, outputs path, etc.)
+### 1. Configure Destinations
+Open `outputs/outputs.txt` and define your target stream endpoints in `name=url` format (one per line):
+```text
+youtube=rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
+kick=rtmps://fa6bc2412803.global-contribute.live-video.net:443/app/YOUR_STREAM_KEY
+twitch=rtmp://live.twitch.tv/app/YOUR_STREAM_KEY
 ```
 
-2. (Optional) Place an `offline.mp4` into `data/` for backup streaming.
-
-3. Start the stack:
-
+### 2. Configure Settings
+Copy the example configuration file:
 ```bash
-docker compose up -d --build
+cp watchdog/config.example.yml config.yml
 ```
+Edit `config.yml` to define your credentials, bitrates, and paths.
 
-CI note
-
-The GitHub Actions workflow was updated to build each service image from its own folder (`./ffmpeg`, `./watchdog`, `./ui`) so buildx finds each `Dockerfile` correctly.
-# restream-stack
-
-Lightweight restreaming stack using MediaMTX, FFmpeg and a Watchdog.
-
-Structure:
-
- - `docker-compose.yml` - services: mediamtx, ffmpeg, watchdog
- - `mediamtx/mediamtx.yml` - minimal MediaMTX configuration
- - `ffmpeg/` - Dockerfile and scripts to run main/backup ffmpeg
- - `watchdog/` - Dockerfile and `watchdog.py` that polls MediaMTX and switches modes
- - `outputs/outputs.txt` - list of destination RTMP endpoints (name=url)
-
-Usage:
-
-1. Edit `outputs/outputs.txt` with your RTMP destinations.
-2. Place an offline video at `ffmpeg/offline.mp4` if you want a custom backup.
-3. Run:
-
-```bash
-docker compose up -d --build
-```
-
-Watchdog will poll MediaMTX API and write `/data/control` to instruct the `ffmpeg` container to run `main` or `backup`.
-
-Web UI:
-
- - A lightweight web UI is available at `http://localhost:8080` (service `ui`). It shows MediaMTX status and allows forcing `main`/`backup`/`stop` or resuming automatic mode.
-
-Restarting transcoder (optional):
-
- - The UI can restart the `ffmpeg` container directly if you mount the Docker socket into the UI container. To enable this, uncomment the following line in `docker-compose.yml` under the `ui` service:
-
+### 3. Provide Backup Media (Optional)
+If you wish to use a custom fallback stream, place an `offline.mp4` video or `offline.png` image inside the `data/` directory and ensure the configuration points to it:
 ```yaml
-		volumes:
-			- /var/run/docker.sock:/var/run/docker.sock
+backup:
+  enabled: true
+  file: "/data/offline.png"
 ```
 
- - If the Docker socket is not available, the UI uses a safe fallback: it writes `/data/manual_mode` with `stop` then `main` to force a restart cycle.
+### 4. Build and Start
+```bash
+docker compose up -d --build
+```
+Access the public dashboard at `http://localhost:8080`. To access administrative commands, go to `http://localhost:8080/admin` and log in with your configured admin password.
 
-Security: admin token
+---
 
- - To prevent unauthorized restarts, set `ui_admin_token` in `config.yml` to a strong secret. The UI will require the `X-Admin-Token` header to be present and matching the token when calling the `/api/restart` endpoint.
+## Security Guidelines
 
-UI additions
+- **Protect Secrets**: Never commit `config.yml` or `outputs.txt` containing raw streaming keys to a public repository. They are added to `.gitignore` by default.
+- **Docker Socket Permissions**: Mounting the Docker socket (`/var/run/docker.sock`) inside the UI container allows restarting containers but exposes root-equivalent access to the host. If security is a priority, do not mount the socket; the UI will seamlessly switch to a secure fallback mechanism (using internal control files via watchdog).
 
- - The UI exposes `/api/outputs` (reads `outputs/outputs.txt`) and `/api/logs` (tails `/data/ffmpeg.log`). Use the buttons on the page to inspect outputs and logs.
-
-Manual override:
-
- - Creating `/data/manual_mode` with value `main`/`backup`/`stop` forces that mode until you write `auto` or remove the file. The UI provides buttons for this.
+Refer to [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) for full architecture details and configuration reference.

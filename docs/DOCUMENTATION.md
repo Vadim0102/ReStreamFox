@@ -1,66 +1,69 @@
-# ReStreamFox — Documentation (English)
+# ReStreamFox — Technical Documentation
 
-## Overview
-ReStreamFox is a small open-source stack to receive a live stream and restream it to multiple destinations using a single FFmpeg encoder instance. The stack uses MediaMTX as the ingest point, a dedicated FFmpeg container for transcode and distribution, and a Watchdog service that monitors MediaMTX and controls FFmpeg.
+## Architecture Overview
 
-Architecture
-- MediaMTX: receives streams via SRT/RTMP/RTSP/WebRTC. Minimal configuration.
-- Watchdog: polls MediaMTX API and controls FFmpeg via control files in `/data`.
-- FFmpeg: runs main transcode (reads from MediaMTX RTSP) or backup loop (offline video) and sends to outputs using `tee`.
-- UI: Flask + Socket.IO admin UI to view status, logs and control the stack.
+ReStreamFox is a microservices-based streaming system orchestrated via Docker Compose. The stack consists of four primary components:
 
-## Quick Start
-1. Edit `outputs/outputs.txt` with your destination RTMP URLs in the format `name=rtmp://...`.
-2. Set secrets in `config.yml`:
-   - `ui_admin_password`: a strong password for admins.
-   - `ui_secret`: Flask secret key for sessions.
-3. (Optional) Mount the Docker socket into the UI container if you want direct container restarts (security risk):
-
-```yaml
-services:
-  ui:
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+```
+                  ┌──────────────┐
+                  │  OBS / Source│
+                  └──────┬───────┘
+                         │ (RTMP/SRT)
+                         ▼
+                  ┌──────────────┐
+                  │   MediaMTX   │◄──────────────┐
+                  └──────┬───────┘               │
+                         │ (RTSP)                │ (API Poll)
+                         ▼                       │
+   ┌──────────┐   ┌──────────────┐   ┌───────────┴──┐
+   │ Outputs  ├──►│    FFmpeg    │◄──┤   Watchdog   │
+   │  (.txt)  │   │  Transcoder  │   │  (Control)   │
+   └──────────┘   └──────────────┘   └──────────────┘
+                         │ (tee muxer)
+                         ▼
+             [ YouTube / Twitch / Kick ]
 ```
 
-4. Build and run:
+1. **MediaMTX**: Serves as the ingest server, accepting incoming streams via RTMP, RTMPS, SRT, RTSP, or WebRTC.
+2. **Watchdog**: A lightweight Python daemon that monitors the MediaMTX API (`/v3/paths/list`). When the stream goes online, it instructs FFmpeg to transcode the feed. When it goes offline, it automatically switches FFmpeg to fallback loop mode.
+3. **FFmpeg**: The transcoding engine. It runs in a controller-loop (`entrypoint.sh`), initiating `transcode.sh` or `backup.sh` based on signals from the watchdog. It uses the `tee` muxer to stream to multiple destinations concurrently.
+4. **UI**: A web interface developed in Flask and Socket.IO. Provides public status monitoring, API configurations, and an authenticated administrative panel (`/admin`) with real-time log streaming.
 
-```bash
-docker compose up -d --build
-```
+---
 
-Open UI: `http://localhost:8080` for public UI; visit `/admin` to login and access admin controls.
+## Configuration Reference (`config.yml`)
 
-## Files and configuration
-- `docker-compose.yml` — orchestrates `mediamtx`, `ffmpeg`, `watchdog`, `ui`.
-- `mediamtx/mediamtx.yml` — minimal configuration for MediaMTX.
-- `ffmpeg/` — Dockerfile and scripts. `entrypoint.sh` reads `/data/control` and `/data/ffmpeg.env` to decide mode.
-- `watchdog/` — Python app that polls MediaMTX and writes control files. Validates `config.yml` and `outputs/outputs.txt` on startup.
-- `outputs/outputs.txt` — list of destinations (one per line): `name=rtmp://...`.
-- `config.yml` — main YAML config. Important keys:
-  - `mediamtx_api` — URL to MediaMTX API.
-  - `path_name` — path to check (default `live`).
-  - `check_interval` — seconds between checks.
-  - `backup.enabled` and `backup.file` — backup loop settings.
-  - `ffmpeg.video`, `ffmpeg.audio` — overrides used to generate `/data/ffmpeg.env`.
-  - `ui_admin_password` — admin login password (plaintext in file by default; use secrets manager in prod).
-  - `ui_secret` — Flask secret for sessions.
+The root configuration schema is evaluated by the watchdog during container startup.
 
-## Security
-- Do not commit `config.yml` with production secrets. Replace with environment variables or mount secrets at runtime.
-- Mounting the Docker socket is powerful and risky. Use a socket-proxy with strict rules if exposing it to a web UI.
+| Section | Key | Type | Description |
+| :--- | :--- | :--- | :--- |
+| - | `mediamtx_api` | String | The HTTP endpoint of your MediaMTX API (e.g. `http://mediamtx:9997`). |
+| - | `path_name` | String | Ingest path name to monitor (default is `live`). |
+| - | `check_interval` | Integer | Interval in seconds between watchdog checks. |
+| `backup` | `enabled` | Boolean | Activates the fallback mode if the main ingest is offline. |
+| `backup` | `file` | String | Path to backup video (`.mp4`) or image (`.png`/`.jpg`). |
+| `ffmpeg.video` | `codec` | String | FFmpeg video codec parameter (e.g., `libx264`). |
+| `ffmpeg.video` | `bitrate` | String | Video encoding bitrate (e.g., `4500k`). |
+| `ffmpeg.video` | `gop` | Integer | Group of Pictures size (GOP) for stream alignment. |
+| `ffmpeg.audio` | `codec` | String | FFmpeg audio codec parameter (e.g., `aac`). |
+| `ffmpeg.audio` | `bitrate` | String | Audio encoding bitrate (e.g., `128k`). |
+| `ui` | `admin_password` | String | Plaintext password used to access `/admin`. |
+| `ui` | `admin_token` | String | Secure token header required for API actions. |
+| `ui` | `secret` | String | Secret key for secure Flask session cookies. |
 
-## Development
-- Python services use `requirements.txt` files per service.
-- To run `watchdog` locally outside Docker:
-  - Create a virtualenv, install `watchdog/requirements.txt`, and run `python watchdog/watchdog.py`.
+---
 
-## CI
-- GitHub Actions workflow builds Docker images (disabled push) and runs simple Python syntax checks.
+## Protocol Multi-plexing
 
-## Troubleshooting
-- `docker logs mediamtx` to check ingest.
-- `docker logs ffmpeg` shows encoder output (or check `/data/ffmpeg.log`).
-- `docker logs watchdog` for watchdog behavior.
+The stack utilizes FFmpeg's `tee` muxer which enables concurrent streaming using a single encoder pass. Destination protocols are parsed automatically inside bash scripts:
 
-*** End Patch
+* **RTMP / RTMPS**: Automatically routed using the `flv` format wrapper. Perfect for standard RTMP ingest platforms and secure endpoints like Kick (`rtmps://`).
+* **SRT / UDP**: Routed using the `mpegts` format wrapper, which provides low-latency delivery over unstable network connections.
+
+---
+
+## Backup Fallback Engine
+
+When the source stream disconnects, the watchdog triggers backup mode:
+- **Video Fallback**: Loops the video file continuously.
+- **Image Fallback**: Takes the static image, loops it, and integrates a synchronized virtual stereo silent audio channel (`anullsrc`), maintaining continuous sync on ingest endpoints.
