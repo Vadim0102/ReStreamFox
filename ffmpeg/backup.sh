@@ -40,12 +40,6 @@ while IFS= read -r line || [ -n "$line" ]; do
   [[ "$line" == \#* ]] && continue
   name=${line%%=*}
   url=${line#*=}
-  
-  # Если протокол не указан явно, подставляем rtmp:// по умолчанию
-  if [[ ! "$url" =~ ^[a-zA-Z0-9]+:// ]]; then
-    url="rtmp://$url"
-  fi
-  
   fmt=$(get_muxer_format "$url")
   TEE_PARTS+=("[f=$fmt]$url")
 done < /outputs/outputs.txt
@@ -60,15 +54,19 @@ TEE_JOINED=$(IFS='|'; echo "${TEE_PARTS[*]}")
 # Check if OFFLINE_FILE is a static image
 if [[ "$OFFLINE_FILE" =~ \.(png|jpg|jpeg|webp)$ ]]; then
   echo "Starting backup loop from static image $OFFLINE_FILE -> $TEE_JOINED"
+  # Используем -map 0:v (видео из картинки) и -map 1:a (аудио из anullsrc)
   exec ffmpeg -re -loop 1 -framerate 25 -i "$OFFLINE_FILE" \
     -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+    -map 0:v -map 1:a \
     -c:v ${VIDEO_CODEC:-libx264} -preset ${PRESET:-veryfast} -tune ${TUNE:-zerolatency} \
     -pix_fmt ${PIX_FMT:-yuv420p} \
     -c:a ${AUDIO_CODEC:-aac} -b:a ${AUDIO_BITRATE:-192k} -ar ${AUDIO_RATE:-48000} \
     -f tee "${TEE_JOINED}"
 else
   echo "Starting backup loop from video file $OFFLINE_FILE -> $TEE_JOINED"
+  # Используем явный маппинг -map 0:v -map 0:a для видеофайла
   exec ffmpeg -stream_loop -1 -re -i "$OFFLINE_FILE" \
+    -map 0:v -map 0:a \
     -c:v ${VIDEO_CODEC:-libx264} -preset ${PRESET:-veryfast} -tune ${TUNE:-zerolatency} \
     -c:a ${AUDIO_CODEC:-aac} -b:a ${AUDIO_BITRATE:-192k} -ar ${AUDIO_RATE:-48000} \
     -f tee "${TEE_JOINED}"

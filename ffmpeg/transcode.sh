@@ -32,12 +32,6 @@ while IFS= read -r line || [ -n "$line" ]; do
   [[ "$line" == \#* ]] && continue
   name=${line%%=*}
   url=${line#*=}
-  
-  # Если протокол не указан явно, подставляем rtmp:// по умолчанию
-  if [[ ! "$url" =~ ^[a-zA-Z0-9]+:// ]]; then
-    url="rtmp://$url"
-  fi
-  
   fmt=$(get_muxer_format "$url")
   TEE_PARTS+=("[f=$fmt]$url")
 done < /outputs/outputs.txt
@@ -51,7 +45,9 @@ TEE_JOINED=$(IFS='|'; echo "${TEE_PARTS[*]}")
 
 echo "Starting main transcode from $INPUT_URL -> $TEE_JOINED"
 
+# Добавлен явный маппинг -map 0:v -map 0:a для корректной передачи потоков в tee
 exec ffmpeg -fflags nobuffer -flags low_delay -i "$INPUT_URL" \
+  -map 0:v -map 0:a \
   -c:v ${VIDEO_CODEC:-libx264} \
   -preset ${PRESET:-veryfast} -tune ${TUNE:-zerolatency} \
   -pix_fmt ${PIX_FMT:-yuv420p} -profile:v ${PROFILE:-high} -level ${LEVEL:-4.2} \
