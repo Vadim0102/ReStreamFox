@@ -1,0 +1,6 @@
+# Example outputs list for ReStreamFox
+# Format: name=destination_url
+# Replace the URLs and stream keys with your targets.
+main=rtmp://a.rtmp.youtube.com/live2/YOUR_YOUTUBE_STREAM_KEY
+backup=rtmp://live.twitch.tv/app/YOUR_TWITCH_STREAM_KEY
+# optional HLS or S3 targets could be added depending on your workflow

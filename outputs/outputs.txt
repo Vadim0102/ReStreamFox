@@ -1,8 +1,0 @@
-# outputs in format name=rtmp_url
-# example:
-# youtube=rtmp://a.rtmp.youtube.com/live2/XXXX-XXXX-XXXX
-# twitch=rtmp://live.twitch.tv/app/STREAM_KEY
-
-youtube=rtmp://youtube.example/app/STREAM_KEY_YT
-twitch=rtmp://twitch.example/app/STREAM_KEY_TW
-kick=rtmp://kick.example/app/STREAM_KEY_KICK

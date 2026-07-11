@@ -7,3 +7,10 @@ __pycache__/
 node_modules/
 env/
 vendor/
+
+# Runtime configuration (do not commit secrets)
+config.yml
+
+# Outputs and runtime data
+outputs/outputs.txt
+data/

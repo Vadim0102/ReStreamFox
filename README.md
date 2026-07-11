@@ -12,6 +12,33 @@ See full documentation in `docs/DOCUMENTATION.md` for architecture, config refer
 Beginner guide
 
 If you're new to Docker or streaming, read `docs/BEGINNER_GUIDE.md` — it explains step-by-step how to set up, configure `outputs/outputs.txt`, set admin secrets, and common troubleshooting steps (including the CI `Dockerfile not found` error and how we fixed it).
+
+Configuration and runtime files
+
+- Template: a build-time template lives at `watchdog/config.example.yml`. Copy it to `watchdog/config.yml` and edit before running, or keep a runtime `config.yml` outside the repository and mount it into containers.
+- Do not commit secrets: `config.yml`, `outputs/outputs.txt` and `data/` are ignored by `.gitignore`.
+- Recommended local override: create `docker-compose.override.yml` with mounts for `./runtime/config.yml:/app/config.yml:ro` and `./data:/data` for testing.
+
+Quick start
+
+1. Copy the example config and edit secrets:
+
+```bash
+cp watchdog/config.example.yml watchdog/config.yml
+# edit watchdog/config.yml (set ui.admin_password, ui.secret, outputs path, etc.)
+```
+
+2. (Optional) Place an `offline.mp4` into `data/` for backup streaming.
+
+3. Start the stack:
+
+```bash
+docker compose up -d --build
+```
+
+CI note
+
+The GitHub Actions workflow was updated to build each service image from its own folder (`./ffmpeg`, `./watchdog`, `./ui`) so buildx finds each `Dockerfile` correctly.
 # restream-stack
 
 Lightweight restreaming stack using MediaMTX, FFmpeg and a Watchdog.

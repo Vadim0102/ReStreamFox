@@ -106,6 +106,33 @@ Web UI
 
 Если вы не уверены в Docker или стриминге, откройте `docs/BEGINNER_GUIDE.md` — в нём пошагово описано: как настроить `outputs/outputs.txt`, задать секреты, запустить стек, и решения частых проблем (включая ошибку CI `Dockerfile not found` и её исправление).
 
+Конфигурация и runtime-файлы
+
+- В репозитории есть шаблон: `watchdog/config.example.yml`. Скопируйте его в `watchdog/config.yml` и отредактируйте перед запуском, либо храните `config.yml` вне репозитория и монтируйте в контейнеры.
+- Не коммитьте секреты: `config.yml`, `outputs/outputs.txt` и `data/` добавлены в `.gitignore`.
+- Рекомендуемый локальный override: создайте `docker-compose.override.yml` с монтированием `./runtime/config.yml:/app/config.yml:ro` и `./data:/data` для удобства разработки.
+
+Быстрый старт
+
+1. Скопируйте пример и отредактируйте секреты:
+
+```bash
+cp watchdog/config.example.yml watchdog/config.yml
+# отредактируйте watchdog/config.yml (ui.admin_password, ui.secret, outputs и т.п.)
+```
+
+2. (Опционально) Поместите `offline.mp4` в папку `data/` для резервного стрима.
+
+3. Запустите стек:
+
+```bash
+docker compose up -d --build
+```
+
+Примечание CI
+
+Workflow GitHub Actions обновлён: образы теперь собираются отдельно из `./ffmpeg`, `./watchdog`, `./ui`, чтобы `buildx` корректно находил `Dockerfile` каждого сервиса.
+
 Ручное управление
 
  - Создайте файл `/data/manual_mode` со значением `main`/`backup`/`stop`, чтобы заставить `ffmpeg` работать в нужном режиме. Чтобы вернуть автоматическое поведение, запишите `auto` или удалите файл. UI предоставляет эти действия.
