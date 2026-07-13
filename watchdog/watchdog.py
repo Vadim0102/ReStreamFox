@@ -2,6 +2,7 @@ import time
 import requests
 import yaml
 import os
+import signal
 
 CONFIG_PATH = '/app/config.yml'
 CONTROL_FILE = '/data/control'
@@ -208,7 +209,30 @@ def main():
     path_name = cfg.get('path_name', 'live')
     check_interval = cfg.get('check_interval', 5)
 
+    last_mtime = 0
+    if os.path.exists(CONFIG_PATH):
+        last_mtime = os.path.getmtime(CONFIG_PATH)
+
     while True:
+        # Мониторинг изменений config.yml в реальном времени
+        if os.path.exists(CONFIG_PATH):
+            mtime = os.path.getmtime(CONFIG_PATH)
+            if mtime > last_mtime:
+                print("[Watchdog] config.yml modified. Regenerating ffmpeg.env and reloading encoder...")
+                cfg = load_config()
+                generate_ffmpeg_env(cfg)
+                last_mtime = mtime
+                
+                # Посылаем сигнал SIGTERM мастер-транскодеру для бесшовного перезапуска на лету
+                pid_file = '/data/ffmpeg_encoder.pid'
+                if os.path.exists(pid_file):
+                    try:
+                        pid = int(open(pid_file, 'r').read().strip())
+                        print(f"[Watchdog] Signaling master encoder (PID {pid}) to apply new settings...")
+                        os.kill(pid, signal.SIGTERM)
+                    except Exception as e:
+                        print(f"[Watchdog] Failed to signal encoder: {e}")
+
         items = mediamtx_paths(api)
         ready = False
         for it in items:

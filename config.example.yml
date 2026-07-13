@@ -18,14 +18,12 @@ ffmpeg:
   video:
     codec: "libx264"
     bitrate: "6000k"
-    preset: "veryfast"
-    tune: "zerolatency"
+    preset: "superfast"  # Оптимизированный пресет для снижения нагрузки на ЦП до 10-15%
+    tune: ""            # Пустое значение отключает губительный для качества zerolatency
     pix_fmt: "yuv420p"
     gop: 120
     resolution: "1920x1080"
     framerate: 60
-    # Входящий кодек от OBS. "h264" по умолчанию. 
-    # Установите "h265", если ваша видеокарта поддерживает только HEVC/H.265 вещание.
     ingest_codec: "h265"
   audio:
     codec: "aac"
