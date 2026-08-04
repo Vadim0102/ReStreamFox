@@ -167,7 +167,10 @@ def validate_outputs_file(path='/outputs/outputs.txt'):
             name, url = line.split('=', 1)
             url = url.strip()
             if '://' not in url:
-                print(f"Warning: line {idx} is missing a protocol scheme (e.g. 'rtmp://'). Assuming 'rtmp://{url}'")
+                if ':443' in url or 'kick' in url.lower():
+                    print(f"Warning: line {idx} missing protocol. Assuming 'rtmps://{url}'")
+                else:
+                    print(f"Warning: line {idx} missing protocol. Assuming 'rtmp://{url}'")
                 has_valid = True
             else:
                 has_valid = True

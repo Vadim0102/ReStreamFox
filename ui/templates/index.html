@@ -2,63 +2,131 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>restream-stack UI</title>
+    <title>ReStreamFox — Панель управления</title>
     <style>
-      body{font-family:system-ui,Arial;margin:20px}
-      .platform{display:inline-block;margin-right:8px;padding:6px;border-radius:6px}
-      .green{background:#e6ffed}
-      .red{background:#ffe6e6}
+      body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;margin:0;padding:20px;background:#121214;color:#e1e1e6}
+      .container{max-width:800px;margin:0 auto}
+      .card{background:#202024;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+      .status-badge{display:inline-block;padding:8px 16px;border-radius:20px;font-weight:bold;font-size:1.1em;margin-bottom:15px}
+      .bg-green{background:#04d361;color:#000}
+      .bg-red{background:#f75a68;color:#fff}
+      .bg-orange{background:#ff9900;color:#000}
+      
+      .btn-master{display:block;width:100%;padding:16px;border:none;border-radius:8px;font-size:1.2em;font-weight:bold;cursor:pointer;transition:all 0.2s}
+      .btn-start{background:#04d361;color:#000}
+      .btn-start:hover{background:#03b252}
+      .btn-stop{background:#f75a68;color:#fff}
+      .btn-stop:hover{background:#d6404f}
+      
+      .btn-group{display:flex;gap:10px;margin-top:15px;flex-wrap:wrap}
+      .btn-sub{background:#29292e;color:#e1e1e6;border:1px solid #323238;padding:10px 16px;border-radius:6px;cursor:pointer}
+      .btn-sub:hover{background:#323238}
+      
+      a{color:#8257e5;text-decoration:none}
+      pre{background:#121214;padding:12px;border-radius:6px;overflow-x:auto}
     </style>
   </head>
   <body>
-    <h1>restream-stack — статус</h1>
-    <h2>INPUT</h2>
-    <div>
-      {% if items %}
-        {% for it in items %}
-          <div><strong>{{ it.name }}</strong>: {{ 'READY' if it.ready else 'OFFLINE' }} — {{ it.video or '' }}</div>
-        {% endfor %}
-      {% else %}
-        <div>Нет ответов от MediaMTX</div>
-      {% endif %}
+    <div class="container">
+      <h1>🦊 ReStreamFox</h1>
+
+      <!-- Главная карточка управления эфиром -->
+      <div class="card">
+        <h2>Статус вещания</h2>
+        {% if current_mode == 'stop' or manual == 'stop' %}
+          <div class="status-badge bg-red">🔴 ВЕЩАНИЕ ОСТАНОВЛЕНО</div>
+          <button class="btn-master btn-start" onclick="setMode('auto')">▶ Включить вещание</button>
+        {% elif current_mode == 'main' %}
+          <div class="status-badge bg-green">🟢 ЭФИР АКТИВЕН (ОСНОВНОЙ ПОТОК)</div>
+          <button class="btn-master btn-stop" onclick="setMode('stop')">⏹ Выключить вещание</button>
+        {% elif current_mode == 'backup' %}
+          <div class="status-badge bg-orange">🟠 В ЭФИРЕ ЗАГЛУШКА (BACKUP)</div>
+          <button class="btn-master btn-stop" onclick="setMode('stop')">⏹ Выключить вещание</button>
+        {% else %}
+          <div class="status-badge bg-orange">🟡 СТАТУС: {{ current_mode or 'Загрузка...' }}</div>
+          <button class="btn-master btn-stop" onclick="setMode('stop')">⏹ Выключить вещание</button>
+        {% endif %}
+
+        <div class="btn-group">
+          <button class="btn-sub" onclick="setMode('auto')">🔄 Автоматический режим</button>
+          <button class="btn-sub" onclick="setMode('main')">⚡ Принудительно MAIN</button>
+          <button class="btn-sub" onclick="setMode('backup')">🖼 Принудительно BACKUP</button>
+          <button class="btn-sub" onclick="restart()">♻ Перезапустить FFmpeg</button>
+        </div>
+      </div>
+
+      <!-- Входящие потоки MediaMTX -->
+      <div class="card">
+        <h3>Входящий поток (OBS / Ingest)</h3>
+        {% if items %}
+          {% for it in items %}
+            <div>
+              <strong>{{ it.name }}</strong>: 
+              {% if it.ready %}
+                <span style="color:#04d361">ГОТОВ К ЭФИРУ</span>
+              {% else %}
+                <span style="color:#7c7c8a">НЕТ СИГНАЛА</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div style="color:#7c7c8a">Нет соединения с MediaMTX</div>
+        {% endif %}
+      </div>
+
+      <!-- Навигация -->
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <button class="btn-sub" onclick="showOutputs()">Платформы вещания</button>
+          <button class="btn-sub" onclick="showLogs()">Логи FFmpeg</button>
+        </div>
+        <div>
+          <a href="/admin">Админ-панель →</a>
+        </div>
+      </div>
     </div>
 
-    <h2>TRANSCODER</h2>
-    <div>Mode: {{ current_mode or 'unknown' }}</div>
-    <div>Manual: {{ manual or 'none' }}</div>
-
-    <h2>ACTIONS</h2>
-    {% if admin_pwd_set %}
-      <p style="color: #666; font-size: 0.9em;">* Actions require admin authentication via <a href="/admin">/admin</a> page.</p>
-    {% endif %}
-    <button onclick="force('main')">Force main</button>
-    <button onclick="force('backup')">Force backup</button>
-    <button onclick="force('stop')">Stop</button>
-    <button onclick="force('auto')">Resume auto</button>
-    <button onclick="restart()">Restart transcoder</button>
-    <button onclick="showOutputs()">Show outputs</button>
-    <button onclick="showLogs()">Show logs</button>
-
     <script>
-      function force(mode){
-        fetch('/api/force',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode})})
-        .then(r=>r.json()).then(j=>{ if(j.ok) alert('ok'); else alert('error: '+ (j.error || 'unauthorized')) })
+      function setMode(mode){
+        fetch('/api/force', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({mode: mode})
+        })
+        .then(r => r.json())
+        .then(j => {
+          if(j.ok) {
+            location.reload();
+          } else {
+            alert('Ошибка: ' + (j.error || 'Требуется авторизация'));
+          }
+        });
       }
 
       function restart(){
-        fetch('/api/restart',{method:'POST'}).then(r=>r.json()).then(j=>{ if(j.ok) alert('restarted'); else alert('error: '+ (j.error || 'unauthorized')) })
+        if(!confirm('Перезапустить службу кодирования?')) return;
+        fetch('/api/restart', {method: 'POST'})
+        .then(r => r.json())
+        .then(j => {
+          if(j.ok) { alert('Успешно перезапущено'); location.reload(); }
+          else alert('Ошибка: ' + (j.error || 'Нет прав'));
+        });
       }
 
       function showOutputs(){
-        fetch('/api/outputs').then(r=>r.json()).then(j=>{ if(j.outputs) alert(JSON.stringify(j.outputs,null,2)) })
+        fetch('/api/outputs').then(r=>r.json()).then(j=>{
+          if(j.outputs) alert("Платформы вывода:\n\n" + j.outputs.map(o => o.name + " -> " + o.url).join("\n"));
+        });
       }
 
       function showLogs(){
-        fetch('/api/logs?n=200').then(r=>r.json()).then(j=>{ if(j.ok) {
+        fetch('/api/logs?n=200').then(r=>r.json()).then(j=>{
+          if(j.ok) {
             const w = window.open('', '_blank');
-            w.document.write('<pre>'+ j.lines.join('') +'</pre>')
-          } else alert('no logs') })
+            w.document.write('<body style="background:#111;color:#eee"><pre>'+ j.lines.join('') +'</pre></body>');
+          } else alert('Логи отсутствуют');
+        });
       }
     </script>
   </body>
-  </html>
+</html>

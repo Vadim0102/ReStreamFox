@@ -1,12 +1,11 @@
 #!/bin/bash
 set -e
 
-# Папка для отслеживания PID-процессов запущенных платформ
+CONTROL_FILE="/data/control"
 PID_DIR="/tmp/pushers"
 mkdir -p "$PID_DIR"
 rm -f "$PID_DIR"/*
 
-# Парсинг входящего кодека из config.yml
 INGEST_CODEC="h264"
 if [ -f /app/config.yml ]; then
   if grep -qi "ingest_codec:.*h265" /app/config.yml; then
@@ -14,7 +13,7 @@ if [ -f /app/config.yml ]; then
   fi
 fi
 
-# 1. Генерация резервного файла под формат OBS
+# 1. Генерация заглушки
 IMG_FILE=""
 for ext in png jpg jpeg webp; do
   if [ -f "/data/offline.${ext}" ]; then
@@ -39,7 +38,6 @@ if [ -n "$IMG_FILE" ]; then
   fi
 fi
 
-# 2. Функция определения формата для пушеров
 get_muxer_format() {
   local url="$1"
   if [[ "$url" =~ ^rtmps?:// ]]; then
@@ -55,28 +53,65 @@ get_muxer_format() {
   fi
 }
 
-# 3. Запуск вечно работающего мастер-транскодера в бесконечном цикле
-echo "Starting Master 24/7 Encoder..."
+# 2. Мастер-транскодер с управлением ВКЛ/ВЫКЛ
+echo "Starting Master Encoder Supervisor..."
 (
+  ENCODER_PID=""
   while true; do
-    echo "[Encoder] Launching transcode..."
-    /app/transcode.sh > /data/ffmpeg.log 2>&1 &
-    ENCODER_PID=$!
-    # Записываем PID транскодера, чтобы Watchdog мог его перезапустить при обновлении конфига
-    echo $ENCODER_PID > /data/ffmpeg_encoder.pid
-    wait $ENCODER_PID || true
-    echo "[Encoder] Process exited. Restarting in 2 seconds..."
+    CTRL="auto"
+    if [ -f "$CONTROL_FILE" ]; then
+      CTRL=$(cat "$CONTROL_FILE" | xargs)
+    fi
+
+    # Если получена команда STOP с сайта
+    if [ "$CTRL" = "stop" ]; then
+      if [ -n "$ENCODER_PID" ] && kill -0 "$ENCODER_PID" 2>/dev/null; then
+        echo "[Encoder] STOP command active. Stopping master encoder..."
+        kill -TERM "$ENCODER_PID" 2>/dev/null || true
+        ENCODER_PID=""
+      fi
+      sleep 2
+      continue
+    fi
+
+    # Если вещание ВКЛЮЧЕНО и кодировщик упал/выключен — запускаем
+    if [ -z "$ENCODER_PID" ] || ! kill -0 "$ENCODER_PID" 2>/dev/null; then
+      echo "[Encoder] Launching transcode..."
+      /app/transcode.sh > /data/ffmpeg.log 2>&1 &
+      ENCODER_PID=$!
+      echo $ENCODER_PID > /data/ffmpeg_encoder.pid
+    fi
+
     sleep 2
   done
 ) &
 
 sleep 3
 
-# 4. Фоновый интерактивный диспетчер (Супервизор) пушеров
+# 3. Интерактивный супервизор пушеров с поддержкой кнопки STOP
 (
   echo "Supervisor: Dynamic outputs watcher started."
   while true; do
-    # Читаем текущий список целевых платформ из outputs.txt
+    CTRL="auto"
+    if [ -f "$CONTROL_FILE" ]; then
+      CTRL=$(cat "$CONTROL_FILE" | xargs)
+    fi
+
+    # Если сайт переключен в STOP — отключаем ВСЕ выходы на платформы
+    if [ "$CTRL" = "stop" ]; then
+      for pid_file in "$PID_DIR"/*; do
+        [ -e "$pid_file" ] || continue
+        name=$(basename "$pid_file")
+        echo "[Supervisor] STOP command active. Terminating stream to '$name'..."
+        pid=$(cat "$pid_file")
+        kill -TERM "$pid" 2>/dev/null || true
+        rm -f "$pid_file"
+      done
+      sleep 2
+      continue
+    fi
+
+    # Нормальная работа при включенном режиме
     declare -A active_targets
     while IFS= read -r line || [ -n "$line" ]; do
       line=$(echo "$line" | xargs)
@@ -86,12 +121,16 @@ sleep 3
       url=${line#*=}
       
       if [[ ! "$url" =~ ^[a-zA-Z0-9]+:// ]]; then
-        url="rtmp://$url"
+        if [[ "$url" =~ :443 ]] || [[ "$url" =~ kick ]]; then
+          url="rtmps://$url"
+        else
+          url="rtmp://$url"
+        fi
       fi
       active_targets["$name"]="$url"
     done < /outputs/outputs.txt
 
-    # Шаг А: Удаляем пушеры, которые были убраны из файла outputs.txt
+    # Удаление снятых платформ
     for pid_file in "$PID_DIR"/*; do
       [ -e "$pid_file" ] || continue
       name=$(basename "$pid_file")
@@ -103,7 +142,7 @@ sleep 3
       fi
     done
 
-    # Шаг Б: Запускаем новые платформы или поднимаем упавшие
+    # Подъем активных платформ
     for name in "${!active_targets[@]}"; do
       url="${active_targets[$name]}"
       pid_file="$PID_DIR/$name"
@@ -119,10 +158,14 @@ sleep 3
       fi
 
       if [ "$running" = false ]; then
-        echo "[Supervisor] Launching new isolated pusher for '$name'..."
+        echo "[Supervisor] Launching new isolated pusher for '$name' ($url)..."
         fmt=$(get_muxer_format "$url")
         
-        # Запускаем фоновую сессию пушера с перехватом системных сигналов
+        EXTRA_FLAGS=""
+        if [ "$fmt" = "flv" ]; then
+          EXTRA_FLAGS="-flvflags no_duration_filesize"
+        fi
+
         sh -c "
           echo \$\$ > '$pid_file'
           cleanup() {
@@ -134,7 +177,7 @@ sleep 3
           while true; do
             echo '[Pusher:$name] Connecting to $url...'
             ffmpeg -fflags nobuffer -rtsp_transport tcp -i 'rtsp://mediamtx:8554/transcoded' \
-              -c copy -f '$fmt' '$url' > '/data/ffmpeg_${name}.log' 2>&1 &
+              -c copy $EXTRA_FLAGS -f '$fmt' '$url' > '/data/ffmpeg_${name}.log' 2>&1 &
             child_pid=\$!
             wait \$child_pid || true
             echo '[Pusher:$name] Connection lost. Reconnecting in 5 seconds...'
@@ -144,9 +187,8 @@ sleep 3
       fi
     done
 
-    sleep 5
+    sleep 3
   done
 ) &
 
-# Удержание главного процесса контейнера
 wait

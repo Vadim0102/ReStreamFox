@@ -78,9 +78,12 @@ def read_outputs(path='/outputs/outputs.txt'):
         if '=' in line:
             name, url = line.split('=', 1)
             url = url.strip()
-            # Автоматическая корректировка отображения при отсутствии схемы
+            # Автоматическая коррекция при отсутствии схемы протокола
             if '://' not in url:
-                url = 'rtmp://' + url
+                if ':443' in url or 'kick' in url.lower():
+                    url = 'rtmps://' + url
+                else:
+                    url = 'rtmp://' + url
             outs.append({'name': name.strip(), 'url': url})
     return outs
 
@@ -149,12 +152,19 @@ def api_force():
 
     data = request.json or {}
     mode = data.get('mode')
+    
+    # Нормализация команд ВКЛ/ВЫКЛ
+    if mode in ('start', 'on'):
+        mode = 'auto'
+    elif mode in ('stop', 'off'):
+        mode = 'stop'
+
     if mode not in ('main', 'backup', 'stop', 'auto'):
         return jsonify({'ok': False, 'error': 'invalid mode'}), 400
     try:
         with open(MANUAL_PATH, 'w', encoding='utf-8') as f:
             f.write(mode)
-        return jsonify({'ok': True})
+        return jsonify({'ok': True, 'mode': mode})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 

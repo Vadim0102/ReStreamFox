@@ -42,14 +42,20 @@ srt: yes
 srtAddress: :8890
 
 rtmp: yes
+rtmpAddress: :1935
+
+# Включение RTMPS сервера (опционально для приёма потока из OBS)
+rtmps: yes
+rtmpsAddress: :1936
+# Для работы RTMPS на приём раскомментируйте пути к SSL-сертификатам:
+# rtmpsTLSCert: /data/cert.pem
+# rtmpsTLSKey: /data/key.pem
 
 rtsp: yes
-
 webrtc: yes
 
 paths:
   live:
-    # Бесшовное удержание потока: если стример не вещает, проигрывается видеофайл
     alwaysAvailable: yes
     alwaysAvailableFile: /data/offline.mp4
   transcoded:
