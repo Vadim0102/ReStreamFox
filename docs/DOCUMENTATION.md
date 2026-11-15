@@ -43,8 +43,8 @@ The root configuration schema is evaluated by the watchdog during container star
 | `backup` | `enabled` | Boolean | Activates the fallback mode if the main ingest is offline. |
 | `backup` | `file` | String | Path to backup video (`.mp4`) or image (`.png`/`.jpg`). |
 | `ffmpeg.video` | `codec` | String | FFmpeg video codec parameter (e.g., `libx264`). |
-| `ffmpeg.video` | `bitrate` | String | Video encoding bitrate (e.g., `4500k`). |
-| `ffmpeg.video` | `gop` | Integer | Group of Pictures size (GOP) for stream alignment. |
+| `ffmpeg.video` | `bitrate` | String | Video target and maximum bitrate for `libx264` (e.g., `4500k`); the VBV buffer is set to the same value. |
+| `ffmpeg.video` | `gop` | Integer | GOP length in frames; the minimum keyframe interval matches it and scene-cut keyframes are disabled. |
 | `ffmpeg.audio` | `codec` | String | FFmpeg audio codec parameter (e.g., `aac`). |
 | `ffmpeg.audio` | `bitrate` | String | Audio encoding bitrate (e.g., `128k`). |
 | `ui` | `admin_password` | String | Plaintext password used to access `/admin`. |

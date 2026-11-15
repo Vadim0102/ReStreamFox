@@ -47,7 +47,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   fi
   
   fmt=$(get_muxer_format "$url")
-  TEE_PARTS+=("[f=fifo:fifo_format=$fmt:onfail=ignore:drop_pkts_on_overflow=1:attempt_recovery=1:recovery_wait_time=5:recover_any_error=1]$url")
+  TEE_PARTS+=("[f=fifo:fifo_format=$fmt:onfail=ignore:fifo_options=drop_pkts_on_overflow=1\\:attempt_recovery=1\\:recovery_wait_time=5\\:recover_any_error=1]$url")
 done < /outputs/outputs.txt
 
 if [ ${#TEE_PARTS[@]} -eq 0 ]; then
@@ -62,9 +62,15 @@ FRAMERATE=${FRAMERATE:-60}
 GOP=${GOP:-$((FRAMERATE * 2))}
 KEYINT_MIN=${KEYINT_MIN:-$GOP}
 RESOLUTION=${RESOLUTION:-1920x1080}
+BITRATE=${BITRATE:-6000k}
 
 # Видеофильтр: масштабирование, приведение к SAR 1:1 и DAR 16:9
 SCALE_FILTER="scale=${RESOLUTION//x/:},setsar=1:1,setdar=16/9"
+
+X264_PARAMS_ARG=()
+if [ "${VIDEO_CODEC:-libx264}" = "libx264" ]; then
+  X264_PARAMS_ARG=(-x264-params 'nal-hrd=cbr:force-cfr=1:open-gop=0')
+fi
 
 # Check if OFFLINE_FILE is a static image
 if [[ "$OFFLINE_FILE" =~ \.(png|jpg|jpeg|webp)$ ]]; then
@@ -77,6 +83,8 @@ if [[ "$OFFLINE_FILE" =~ \.(png|jpg|jpeg|webp)$ ]]; then
     -c:v ${VIDEO_CODEC:-libx264} -preset ${PRESET:-veryfast} -tune ${TUNE:-zerolatency} \
     -pix_fmt ${PIX_FMT:-yuv420p} \
     -g "$GOP" -keyint_min "$KEYINT_MIN" -sc_threshold 0 \
+    -b:v "$BITRATE" -maxrate "$BITRATE" -bufsize "$BITRATE" \
+    "${X264_PARAMS_ARG[@]}" \
     -c:a ${AUDIO_CODEC:-aac} -b:a ${AUDIO_BITRATE:-192k} -ar ${AUDIO_RATE:-48000} \
     -f tee "${TEE_JOINED}"
 else
@@ -88,6 +96,8 @@ else
     -c:v ${VIDEO_CODEC:-libx264} -preset ${PRESET:-veryfast} -tune ${TUNE:-zerolatency} \
     -pix_fmt ${PIX_FMT:-yuv420p} \
     -g "$GOP" -keyint_min "$KEYINT_MIN" -sc_threshold 0 \
+    -b:v "$BITRATE" -maxrate "$BITRATE" -bufsize "$BITRATE" \
+    "${X264_PARAMS_ARG[@]}" \
     -c:a ${AUDIO_CODEC:-aac} -b:a ${AUDIO_BITRATE:-192k} -ar ${AUDIO_RATE:-48000} \
     -f tee "${TEE_JOINED}"
 fi
